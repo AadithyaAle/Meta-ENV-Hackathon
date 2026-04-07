@@ -124,15 +124,18 @@ async def main() -> None:
 
     try:
         # Await the reset if your environment is async, otherwise standard env.reset()
-        result = env.reset() 
-        if asyncio.iscoroutine(result):
-            result = await result
+        reset_result = env.reset() 
+        if asyncio.iscoroutine(reset_result):
+            reset_result = await reset_result
             
-        obs_dict = result.observation.model_dump()
+        # Unpack the standard Gym tuple: (observation, info)
+        obs, info = reset_result
+        obs_dict = obs.model_dump()
         last_feedback = "Environment initialized."
+        done = False
 
         for step in range(1, MAX_STEPS + 1):
-            if result.done:
+            if done:
                 break
 
             # 1. Ask the Hugging Face LLM what to do
@@ -144,10 +147,12 @@ async def main() -> None:
             if asyncio.iscoroutine(step_result):
                 step_result = await step_result
             
-            # 3. Update the state
-            obs_dict = step_result.observation.model_dump()
-            reward = step_result.reward or 0.0
-            done = step_result.done
+            # 3. Unpack standard Gym step tuple: (obs, reward, terminated, truncated, info)
+            obs, reward, terminated, truncated, info = step_result
+            done = terminated or truncated
+            
+            # Update the state
+            obs_dict = obs.model_dump()
             
             # Catching logic errors from Teammate 1's backend
             error = None 
