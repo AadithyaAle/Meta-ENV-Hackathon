@@ -31,6 +31,7 @@ class DataCleanerEnv(gym.Env):
         # ---- TASK 1: EASY ----
         if self.current_task == "easy":
             self.df = pd.DataFrame({
+                "ID": [1, 2, 3, 4, 5],
                 "Name": ["Alice", "Bob", "Charlie", "David", "Eve"],
                 "Email": ["alice@example.com", "bob@example.com", None, "david@example.com", "eve@example.com"],
             })
@@ -52,7 +53,7 @@ class DataCleanerEnv(gym.Env):
         return self._get_observation(), {}
 
     def step(self, action: Action):
-        reward = 0.0
+        reward = -0.05
         terminated = False
         truncated = False
         self.last_action_feedback = ""
@@ -118,11 +119,18 @@ class DataCleanerEnv(gym.Env):
                 
                 # Step A: Base requirement - Ensure there are no missing values left anywhere
                 if self.df.isna().sum().sum() > 0:
-                    self.last_action_feedback = "Submission Failed: There are still missing values in the dataset."
+                    self.last_action_feedback = "Submission Failed: There are still missing values."
                     reward = 0.0
                     terminated = True
-                    return self._get_observation(), reward, terminated, truncated, {} # <-- FIXED: removed 'info'
+                    return self._get_observation(), reward, terminated, truncated, {}
 
+                # Step A.2: THE ANTI-CHEAT DATA LOSS MONITOR
+                expected_rows = {"easy": 4, "medium": 5, "hard": 5}[self.current_task]
+                if len(self.df) != expected_rows:
+                    self.last_action_feedback = f"Submission Failed: Data Loss Detected! Expected {expected_rows} rows, but got {len(self.df)}. Did you drop rows you weren't supposed to?"
+                    reward = 0.0
+                    terminated = True
+                    return self._get_observation(), reward, terminated, truncated, {}
                 # Step B: The PyTorch Validator (The Standout Feature)
                 try:
                     # We only want to convert numerical columns to a tensor. 
