@@ -24,6 +24,7 @@ class DataCleanerEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.last_action_feedback = ""
+        self.df_history = [] # Tracks past states
 
         # Randomly select task: easy, medium, or hard
         self.current_task = random.choice(["easy", "medium", "hard"])
@@ -43,11 +44,11 @@ class DataCleanerEnv(gym.Env):
                 "Age": ["25", "30", "22", "40", "28"],
             })
 
-        # ---- TASK 3: HARD ----
+        # ---- TASK 3: HARD (Silent Corruption) ----
         elif self.current_task == "hard":
             self.df = pd.DataFrame({
-                "Name": ["Alice", "Bob", "Charlie", "David", "Eve"],
-                "Salary": ["1,000", "2,500", None, "4,000", None],
+                "Name": ["Alice ", " Bob", "Charlie", "David\n", " Eve "], # Dirty strings!
+                "Salary": ["1,000 ", "\n2,500", None, " 4,000 ", None],    # Commas AND whitespace!
             })
 
         return self._get_observation(), {}
@@ -59,6 +60,10 @@ class DataCleanerEnv(gym.Env):
         self.last_action_feedback = ""
 
         try:
+            # Save current state before modifying (but don't save if it's just a submission or undo)
+            if action.tool not in ["submit_final_dataset", "undo_last_action"]:
+                self.df_history.append(self.df.copy())
+
             # ---- DROP MISSING ROWS ----
             if action.tool == "drop_missing_rows":
                 if self.current_task == "hard":
@@ -81,6 +86,16 @@ class DataCleanerEnv(gym.Env):
 
                 self.df[target_column] = self.df[target_column].fillna(new_value)
                 self.last_action_feedback = f"Filled missing values in {target_column}"
+            
+            # ---- UNDO LAST ACTION ----
+            elif action.tool == "undo_last_action":
+                if len(self.df_history) > 0:
+                    self.df = self.df_history.pop()
+                    self.last_action_feedback = "Reverted dataset to previous state."
+                    reward = 0.0 # No penalty for undoing a mistake!
+                else:
+                    self.last_action_feedback = "Cannot undo: No history available."
+                    reward = -0.1
 
             # ---- RENAME COLUMN ----
             elif action.tool == "rename_column":
@@ -171,7 +186,7 @@ class DataCleanerEnv(gym.Env):
         elif self.current_task == "medium":
             instructions += "Rename the column 'usr_nm' to 'username'. Ensure the 'Age' column is cast to an 'int'. When finished, you MUST use the 'submit_final_dataset' tool."
         elif self.current_task == "hard":
-            instructions += "Do NOT drop rows. Fill missing 'Salary' values with '0'. Remove commas from the 'Salary' strings and convert the column to an 'int'. When finished, you MUST use the 'submit_final_dataset' tool."
+            instructions += "Do NOT drop rows. Fill missing 'Salary' with '0'. Clean ALL hidden whitespace and newlines from strings. Remove commas from 'Salary' and cast to 'int'. Then use 'submit_final_dataset'."
 
         return Observation(
             current_columns=list(self.df.columns),
