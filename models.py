@@ -20,7 +20,7 @@ class Action(BaseModel):
         "fill_missing_values", 
         "rename_column", 
         "change_data_type", 
-        "submit_final_dataset"
+        "submit_final_dataset",
         "undo_last_action"
     ]
     target_column: Optional[str] = None
