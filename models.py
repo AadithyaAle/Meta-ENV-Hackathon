@@ -25,3 +25,6 @@ class Action(BaseModel):
     ]
     target_column: Optional[str] = None
     new_value: Optional[str] = None
+
+SstHackathonAction = Action
+SstHackathonObservation = Observation
