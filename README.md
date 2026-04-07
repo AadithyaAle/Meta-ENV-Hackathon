@@ -1,255 +1,94 @@
----
-title: Sst Hackathon Env Environment Server
-emoji: ⛳
-colorFrom: green
-colorTo: indigo
-sdk: docker
-pinned: false
-app_port: 8000
-base_path: /web
-tags:
-  - openenv
----
+# OpenEnv: Messy Data Pipeline Cleaner 🧹📊
 
-# Sst Hackathon Env Environment
+## Environment Description & Motivation
+Data cleaning and preprocessing is universally recognized as the single largest bottleneck in the machine learning lifecycle. This environment models the genuine, highly valuable real-world task of an automated Data Engineer. 
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+An AI agent is provided with a corrupted dataset (containing missing values, incorrect data types, and wrong column names) and must use standard data engineering operations to transform it into a clean state that perfectly matches a target schema. This environment tests an LLM's ability to reason about data structures, execute precise tabular transformations, and recover from strict formatting errors.
 
-## Quick Start
+## Action and Observation Spaces
 
-The simplest way to use the Sst Hackathon Env environment is through the `SstHackathonEnv` class:
+This environment strictly follows the OpenEnv specification using typed Pydantic models.
 
-```python
-from SST_hackathon_env import SstHackathonAction, SstHackathonEnv
+### Observation Space
+The agent receives a state dictionary representing the current condition of the dataset:
+* `current_columns` (List[str]): The current column names in the dataset.
+* `data_types` (Dict[str, str]): Dictionary mapping columns to their pandas `dtypes`.
+* `missing_values` (Dict[str, int]): Count of `NaN`/Null values per column.
+* `data_preview` (str): A markdown table of the first 5 rows to provide the LLM with contextual data grounding.
+* `target_schema_instructions` (str): The goal state the agent must reach to achieve a reward of 1.0.
+* `last_action_feedback` (str): System feedback from the previous action (e.g., "Success: Dropped 5 rows" or "Error: KeyError - column not found").
 
-try:
-    # Create environment from Docker image
-    SST_hackathon_envenv = SstHackathonEnv.from_docker_image("SST_hackathon_env-env:latest")
+### Action Space
+The agent must return a structured JSON object choosing a specific data engineering tool and its parameters:
+* `tool` (Literal): The operation to perform. Must be one of:
+  * `drop_missing_rows`
+  * `fill_missing_values`
+  * `rename_column`
+  * `change_data_type`
+  * `submit_final_dataset`
+* `target_column` (Optional[str]): The specific column to apply the transformation to.
+* `new_value` (Optional[str]): The new name (for renaming) or replacement value (for filling nulls/casting types).
 
-    # Reset
-    result = SST_hackathon_envenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
+## Task Descriptions & Difficulty
 
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
+The environment features an automated, deterministic grader that evaluates the final dataset against a hidden "perfect" dataframe. 
 
-    for msg in messages:
-        result = SST_hackathon_envenv.step(SstHackathonAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
+1. **Task 1 (Easy):** * **Objective:** Clean a dataset containing simple null values.
+   * **Expected Actions:** The agent must identify the column with missing values, use the `drop_missing_rows` tool to remove those specific rows, and submit the dataset.
 
-finally:
-    # Always clean up
-    SST_hackathon_envenv.close()
-```
+2. **Task 2 (Medium):** * **Objective:** Standardize a dataset with bad metadata.
+   * **Expected Actions:** The agent must use `rename_column` to fix improperly formatted column headers (e.g., changing `usr_nm` to `username`) and use `change_data_type` to cast string-based numerical columns into proper integer formats.
 
-That's it! The `SstHackathonEnv.from_docker_image()` method handles:
-- Starting the Docker container
-- Waiting for the server to be ready
-- Connecting to the environment
-- Container cleanup when you call `close()`
+3. **Task 3 (Hard):** * **Objective:** Perform complex data imputation and string parsing.
+   * **Expected Actions:** The agent must identify missing values that cannot be dropped, use `fill_missing_values` to safely impute them with a default string (e.g., "Unknown"), and parse complex numerical strings containing commas (e.g., "1,000") into valid integers without crashing the pipeline.
 
-## Building the Docker Image
-
-Before using the environment, you need to build the Docker image:
-
-```bash
-# From project root
-docker build -t SST_hackathon_env-env:latest -f server/Dockerfile .
-```
-
-## Deploying to Hugging Face Spaces
-
-You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
-
-```bash
-# From the environment directory (where openenv.yaml is located)
-openenv push
-
-# Or specify options
-openenv push --namespace my-org --private
-```
-
-The `openenv push` command will:
-1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepare a custom build for Hugging Face Docker space (enables web interface)
-3. Upload to Hugging Face (ensuring you're logged in)
+## Setup and Usage Instructions
 
 ### Prerequisites
+* Python 3.10+
+* Docker (for final validation and OpenEnv deployment)
 
-- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
+### Local Setup
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd <your-repo-directory>
+   ```
 
-### Options
+2. **Install the required dependencies:**
+   ```bash
+   pip install pandas gymnasium openenv-core pydantic openai python-dotenv
+   ```
 
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
+3. **Configure Environment Variables:**
+   Create a `.env` file in the root directory and add your Hugging Face API token:
+   ```env
+   HF_TOKEN="your_hf_access_token_here"
+   API_BASE_URL="[https://router.huggingface.co/v1](https://router.huggingface.co/v1)"
+   MODEL_NAME="Qwen/Qwen2.5-72B-Instruct"
+   ```
 
-### Examples
-
+### Running the Inference Baseline
+To run the automated agent against the environment and reproduce the baseline scores:
 ```bash
-# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
-openenv push
-
-# Push to a specific repository
-openenv push --repo-id my-org/my-env
-
-# Push with a custom base image
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
-
-# Push as a private space
-openenv push --private
-
-# Combine options
-openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
+python inference.py
 ```
 
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
-- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
-
-## Environment Details
-
-### Action
-**SstHackathonAction**: Contains a single field
-- `message` (str) - The message to echo back
-
-### Observation
-**SstHackathonObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
-- `metadata` (dict) - Additional info like step count
-
-### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
-
-## Advanced Usage
-
-### Connecting to an Existing Server
-
-If you already have a Sst Hackathon Env environment server running, you can connect directly:
-
-```python
-from SST_hackathon_env import SstHackathonEnv
-
-# Connect to existing server
-SST_hackathon_envenv = SstHackathonEnv(base_url="<ENV_HTTP_URL_HERE>")
-
-# Use as normal
-result = SST_hackathon_envenv.reset()
-result = SST_hackathon_envenv.step(SstHackathonAction(message="Hello!"))
-```
-
-Note: When connecting to an existing server, `SST_hackathon_envenv.close()` will NOT stop the server.
-
-### Using the Context Manager
-
-The client supports context manager usage for automatic connection management:
-
-```python
-from SST_hackathon_env import SstHackathonAction, SstHackathonEnv
-
-# Connect with context manager (auto-connects and closes)
-with SstHackathonEnv(base_url="http://localhost:8000") as env:
-    result = env.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-    # Multiple steps with low latency
-    for msg in ["Hello", "World", "!"]:
-        result = env.step(SstHackathonAction(message=msg))
-        print(f"Echoed: {result.observation.echoed_message}")
-```
-
-The client uses WebSocket connections for:
-- **Lower latency**: No HTTP connection overhead per request
-- **Persistent session**: Server maintains your environment state
-- **Efficient for episodes**: Better for many sequential steps
-
-### Concurrent WebSocket Sessions
-
-The server supports multiple concurrent WebSocket connections. To enable this,
-modify `server/app.py` to use factory mode:
-
-```python
-# In server/app.py - use factory mode for concurrent sessions
-app = create_app(
-    SstHackathonEnvironment,  # Pass class, not instance
-    SstHackathonAction,
-    SstHackathonObservation,
-    max_concurrent_envs=4,  # Allow 4 concurrent sessions
-)
-```
-
-Then multiple clients can connect simultaneously:
-
-```python
-from SST_hackathon_env import SstHackathonAction, SstHackathonEnv
-from concurrent.futures import ThreadPoolExecutor
-
-def run_episode(client_id: int):
-    with SstHackathonEnv(base_url="http://localhost:8000") as env:
-        result = env.reset()
-        for i in range(10):
-            result = env.step(SstHackathonAction(message=f"Client {client_id}, step {i}"))
-        return client_id, result.observation.message_length
-
-# Run 4 episodes concurrently
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(run_episode, range(4)))
-```
-
-## Development & Testing
-
-### Direct Environment Testing
-
-Test the environment logic directly without starting the HTTP server:
-
+### Running the OpenEnv Validator
+To ensure the Hugging Face Space deployment and Docker container meet the hackathon requirements:
 ```bash
-# From the server directory
-python3 server/SST_hackathon_env_environment.py
+chmod +x scripts/validate-submission.sh
+./scripts/validate-submission.sh [https://your-hf-space-url.hf.space](https://your-hf-space-url.hf.space)
 ```
 
-This verifies that:
-- Environment resets correctly
-- Step executes actions properly
-- State tracking works
-- Rewards are calculated correctly
+## Baseline Scores
 
-### Running Locally
+* **Model Evaluated:** `Qwen/Qwen2.5-72B-Instruct`
+* **Inference Endpoint:** Hugging Face Serverless Router (`https://router.huggingface.co/v1`)
+* **Task 1 (Easy) Score:** [PENDING EVALUATION]
+* **Task 2 (Medium) Score:** [PENDING EVALUATION]
+* **Task 3 (Hard) Score:** [PENDING EVALUATION]
+* **Overall Pass Rate:** [PENDING EVALUATION]
 
-Run the server locally for development:
-
-```bash
-uvicorn server.app:app --reload
-```
-
-## Project Structure
-
-```
-SST_hackathon_env/
-├── .dockerignore         # Docker build exclusions
-├── __init__.py            # Module exports
-├── README.md              # This file
-├── openenv.yaml           # OpenEnv manifest
-├── pyproject.toml         # Project metadata and dependencies
-├── uv.lock                # Locked dependencies (generated)
-├── client.py              # SstHackathonEnv client
-├── models.py              # Action and Observation models
-└── server/
-    ├── __init__.py        # Server module exports
-    ├── SST_hackathon_env_environment.py  # Core environment logic
-    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
-    └── Dockerfile         # Container image definition
+*(Note: Scores will be updated upon final execution of the inference pipeline prior to submission).*
 ```
