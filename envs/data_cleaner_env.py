@@ -145,11 +145,11 @@ class DataCleanerEnv(gym.Env):
     def _get_observation(self):
         instructions = ""
         if self.current_task == "easy":
-            instructions = "Ensure there are no missing values in the dataset. Use drop_missing_rows."
+            instructions = "Ensure there are no missing values in the dataset. Use drop_missing_rows. When finished, you MUST use the 'submit_final_dataset' tool."
         elif self.current_task == "medium":
-            instructions = "Rename the column 'usr_nm' to 'username'. Ensure the 'Age' column is cast to an 'int'."
+            instructions = "Rename the column 'usr_nm' to 'username'. Ensure the 'Age' column is cast to an 'int'. When finished, you MUST use the 'submit_final_dataset' tool."
         elif self.current_task == "hard":
-            instructions = "Do NOT drop rows. Fill missing 'Salary' values with '0'. Remove commas from the 'Salary' strings and convert the column to an 'int'."
+            instructions = "Do NOT drop rows. Fill missing 'Salary' values with '0'. Remove commas from the 'Salary' strings and convert the column to an 'int'. When finished, you MUST use the 'submit_final_dataset' tool."
 
         return Observation(
             current_columns=list(self.df.columns),
