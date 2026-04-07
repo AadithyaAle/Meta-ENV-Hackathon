@@ -1,8 +1,7 @@
-gymnasium==1.0.0
+openenv
 pandas
 torch
+numpy
 pydantic
-python-dotenv
-gradio
-huggingface_hub
 openai
+python-dotenv
