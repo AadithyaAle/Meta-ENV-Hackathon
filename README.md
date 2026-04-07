@@ -1,3 +1,12 @@
+---
+title: PramanaEnv Data Cleaner
+emoji: 🧹
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+app_file: app.py
+pinned: false
+---
 # 🧹 Meta OpenEnv: Self-Healing Data Pipeline Environment
 
 **Built for the Meta PyTorch OpenEnv Hackathon**
