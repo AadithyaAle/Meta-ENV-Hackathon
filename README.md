@@ -3,8 +3,7 @@ title: PramanaEnv Data Cleaner
 emoji: 🧹
 colorFrom: blue
 colorTo: indigo
-sdk: gradio
-app_file: app.py
+sdk: docker
 pinned: false
 ---
 # 🧹 Meta OpenEnv: Self-Healing Data Pipeline Environment
