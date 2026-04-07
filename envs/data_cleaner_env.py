@@ -143,14 +143,22 @@ class DataCleanerEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, {}
 
     def _get_observation(self):
-        """Convert current DataFrame into Observation for the AI agent"""
+        instructions = ""
+        if self.current_task == "easy":
+            instructions = "Ensure there are no missing values in the dataset. Use drop_missing_rows."
+        elif self.current_task == "medium":
+            instructions = "Rename the column 'usr_nm' to 'username'. Ensure the 'Age' column is cast to an 'int'."
+        elif self.current_task == "hard":
+            instructions = "Do NOT drop rows. Fill missing 'Salary' values with '0'. Remove commas from the 'Salary' strings and convert the column to an 'int'."
+
         return Observation(
             current_columns=list(self.df.columns),
-            data_types={col: str(dtype) for col, dtype in self.df.dtypes.items()},
-            missing_values={col: self.df[col].isna().sum() for col in self.df.columns},
-            data_preview=self.df.head().to_string(index=False),
-            target_schema_instructions="Clean the dataset according to the task rules",
-            last_action_feedback=self.last_action_feedback
+            # Force standard Python strings and ints to make Pydantic happy
+            data_types={str(col): str(dtype) for col, dtype in self.df.dtypes.items()},
+            missing_values={str(col): int(val) for col, val in self.df.isna().sum().items()},
+            data_preview=self.df.head().to_markdown(),
+            target_schema_instructions=instructions,
+            last_action_feedback=self.last_action_feedback,
         )
 
     def render(self):

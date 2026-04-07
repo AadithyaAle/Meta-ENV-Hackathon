@@ -1,27 +1,26 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+from pydantic import BaseModel, ConfigDict
+from typing import Literal, Optional, Dict, List
 
-"""
-Data models for the Sst Hackathon Env Environment.
+class Observation(BaseModel):
+    # This config line allows OpenEnv to be a bit more forgiving
+    model_config = ConfigDict(extra='ignore') 
+    
+    current_columns: List[str]
+    data_types: Dict[str, str]
+    missing_values: Dict[str, int]
+    data_preview: str 
+    target_schema_instructions: str
+    last_action_feedback: str 
 
-The SST_hackathon_env environment is a simple test environment that echoes back messages.
-"""
+class Action(BaseModel):
+    model_config = ConfigDict(extra='ignore')
 
-from openenv.core.env_server.types import Action, Observation
-from pydantic import Field
-
-
-class SstHackathonAction(Action):
-    """Action for the Sst Hackathon Env environment - just a message to echo."""
-
-    message: str = Field(..., description="Message to echo back")
-
-
-class SstHackathonObservation(Observation):
-    """Observation from the Sst Hackathon Env environment - the echoed message."""
-
-    echoed_message: str = Field(default="", description="The echoed message")
-    message_length: int = Field(default=0, description="Length of the echoed message")
+    tool: Literal[
+        "drop_missing_rows", 
+        "fill_missing_values", 
+        "rename_column", 
+        "change_data_type", 
+        "submit_final_dataset"
+    ]
+    target_column: Optional[str] = None
+    new_value: Optional[str] = None
