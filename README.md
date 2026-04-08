@@ -1,9 +1,10 @@
 ---
-title: PramanaEnv Data Cleaner
+title: PramanaEnv
 emoji: 🧹
 colorFrom: blue
 colorTo: indigo
 sdk: docker
+app_port: 8000
 pinned: false
 ---
 # 🧹 Meta OpenEnv: Self-Healing Data Pipeline Environment
