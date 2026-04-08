@@ -37,11 +37,11 @@ class DataCleanerClient(EnvClient):
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 HF_SPACE_URL = os.getenv("HF_SPACE_URL", "https://sukuna191552s-pramanaenv.hf.space")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct") 
 TASK_NAME = os.getenv("TASK_NAME", "data_cleaning")
 BENCHMARK = os.getenv("BENCHMARK", "openenv_data_cleaner")
 MAX_STEPS = 10
-TEMPERATURE = 0.4  # High enough to be creative, low enough to be strict JSON
+TEMPERATURE = 0.4  
 MAX_TOKENS = 300
 SUCCESS_SCORE_THRESHOLD = 0.8 
 
@@ -60,6 +60,7 @@ SYSTEM_PROMPT = textwrap.dedent(
     4. submit_final_dataset: Use ONLY when you believe the dataset fully matches the instructions.
     
     CRITICAL RULES:
+    - Look closely at the 'missing_values' dictionary to see what needs fixing.
     - If the 'Feedback from Previous Action' indicates an error or no change, DO NOT repeat the previous action. Try a different tool.
     
     You must output STRICTLY as a JSON object:
@@ -108,6 +109,7 @@ def extract_obs_safe(raw_data):
     return obs_obj.model_dump() if hasattr(obs_obj, 'model_dump') else dict(obs_obj)
 
 async def main() -> None:
+    print(f"Connecting to live environment at: {HF_SPACE_URL}")
     env = DataCleanerClient(HF_SPACE_URL) 
     llm_client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
@@ -118,10 +120,12 @@ async def main() -> None:
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
+        print("Sending reset command...")
         raw_reset = await env.reset() 
         obs_dict = extract_obs_safe(raw_reset)
         last_feedback = "Environment initialized."
         done = False
+        print("Reset successful! Smart LLM Agent taking over...\n")
 
         for step in range(1, MAX_STEPS + 1):
             if done: break
@@ -131,25 +135,30 @@ async def main() -> None:
             last_action_str = action_json_str
 
             raw_step = await env.step(action)
-            
-            if isinstance(raw_step, tuple) and len(raw_step) >= 4:
-                obs_obj, reward, terminated, truncated = raw_step[0], float(raw_step[1]), bool(raw_step[2]), bool(raw_step[3])
-            else:
-                obs_obj, reward, terminated, truncated = (raw_step[0] if isinstance(raw_step, tuple) else raw_step), 0.0, False, False
-
-            done = terminated or truncated
+            obs_obj = raw_step[0] if isinstance(raw_step, tuple) else raw_step
             obs_dict = obs_obj.model_dump() if hasattr(obs_obj, 'model_dump') else dict(obs_obj)
+            
+            # --- THE FIX: Extracting data from INSIDE the Observation payload ---
             last_feedback = obs_dict.get("last_action_feedback", "Action executed.")
+            reward = float(obs_dict.get("reward", 0.0))
+            done = bool(obs_dict.get("done", False))
 
             rewards.append(reward)
             steps_taken = step
+            
+            # Keep the bot's required format intact
             log_step(step=step, action=action_json_str, reward=reward, done=done, error=None)
+            
+            # NEW: X-Ray Vision prints so we can see what the server is doing!
+            print(f"   [X-RAY] Server Feedback: {last_feedback}")
+            print(f"   [X-RAY] Missing Values: {obs_dict.get('missing_values')}")
+            print("-" * 50)
 
-        # Pure, organic score calculation (No overrides)
         score = min(max(sum(rewards), 0.0), 1.0) 
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as e:
+        print(f"\n[CRITICAL ERROR] Failed to communicate:")
         traceback.print_exc()
         score, success = 0.0, False
     finally:
