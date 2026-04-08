@@ -43,6 +43,7 @@ class SstHackathonEnvironment(Environment):
             missing_values=self.df.isnull().sum().to_dict(),
             data_preview=self.df.head().to_markdown(),
             last_action_feedback=feedback,
+            target_schema_instructions="Clean the dataset for PyTorch: handle missing values and encode categories.",
             done=False,
             reward=0.0
         )
