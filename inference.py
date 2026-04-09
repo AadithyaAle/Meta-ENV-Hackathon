@@ -9,10 +9,7 @@ from dotenv import load_dotenv
 from openenv.core.env_client import EnvClient
 from openai import OpenAI
 
-try:
-    from models import Action, Observation
-except ImportError:
-    from envs.data_cleaner_env import Action, Observation
+from models import Action, Observation
 
 load_dotenv()
 
