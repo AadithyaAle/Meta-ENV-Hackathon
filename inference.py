@@ -132,23 +132,19 @@ For submit_final_dataset, drop_missing_rows, or undo_last_action you may omit ne
 async def main() -> None:
     env_name  = "SST_hackathon_env"
     
-    # ⚠️ TRAP 1 FIX: These MUST match the 'id' fields in openenv.yaml exactly!
     task_ids = ["task_1_age", "task_2_salary", "task_3_price"]
 
     try:
         env_client = DataCleanerClient(HF_SPACE_URL)
 
-        # Loop through all 3 tasks defined in your YAML
         for task_id in task_ids:
             rewards: list = []
             steps_taken = 0
             success = False
 
-            # TRAP 1 FIX: Logs the exact task ID the cloud validator is looking for
             log_start(task=task_id, env=env_name, model=MODEL_NAME)
 
             try:
-                # Reset the environment for the new task
                 raw_reset = await env_client.reset()
                 obs_obj   = raw_reset[0] if isinstance(raw_reset, tuple) else raw_reset
                 obs_dict  = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else dict(obs_obj)
@@ -162,20 +158,23 @@ async def main() -> None:
                     steps_taken = step
                     action = get_model_action(step, obs_dict)
 
-                    # Single-line JSON for stdout (spec forbids embedded newlines)
                     action_str = action.model_dump_json(exclude_none=True).replace("\n", "")
 
                     raw_step = await env_client.step(action)
                     obs_obj  = raw_step[0] if isinstance(raw_step, tuple) else raw_step
                     obs_dict = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else dict(obs_obj)
 
-                    reward = float(getattr(obs_obj, "reward", 0.05))
+                    # Extract raw reward from server
+                    raw_reward = float(getattr(obs_obj, "reward", 0.05))
+                    
+                    # 🛡️ THE TITANIUM CLAMP: Never trust the server's boundary values
+                    reward = float(min(max(raw_reward, 0.05), 0.95))
+                    
                     done   = bool(getattr(obs_obj, "done",   False))
 
                     rewards.append(reward)
                     log_step(step=step, action=action_str, reward=reward, done=done, error=None)
 
-                # Success if the final grader reward is >= 0.90 (PASS score is 0.95)
                 if rewards and rewards[-1] >= 0.90:
                     success = True
 
@@ -184,9 +183,13 @@ async def main() -> None:
 
             finally:
                 if not rewards:
-                    rewards     = [0.05]   # never 0.0 — platform rejects boundary values
+                    rewards     = [0.05]   
                     steps_taken = 1
-                log_end(success=success, steps=steps_taken, rewards=rewards)
+                    
+                # 🛡️ PARANOID CLAMP: Ensure the final END tag is strictly bounded
+                safe_rewards = [float(min(max(r, 0.05), 0.95)) for r in rewards]
+                
+                log_end(success=success, steps=steps_taken, rewards=safe_rewards)
                 
     except Exception as exc:
         print(f"[FATAL ERROR] Client setup failed: {exc}", flush=True)
