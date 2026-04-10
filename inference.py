@@ -59,10 +59,11 @@ def log_step(step: int, action: str, reward: float, done: bool, error=None):
         flush=True,
     )
 
-def log_end(success: bool, steps: int, rewards: list):
+def log_end(success: bool, steps: int, score: float, rewards: list):
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    # Added score={score:.3f} back in!
     print(
-        f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
+        f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
         flush=True,
     )
 
@@ -186,10 +187,20 @@ async def main() -> None:
                     rewards     = [0.05]   
                     steps_taken = 1
                     
-                # 🛡️ PARANOID CLAMP: Ensure the final END tag is strictly bounded
                 safe_rewards = [float(min(max(r, 0.05), 0.95)) for r in rewards]
                 
-                log_end(success=success, steps=steps_taken, rewards=safe_rewards)
+                # Calculate the final clamped score (using the last reward)
+                final_score = safe_rewards[-1]
+                
+                # Gracefully close the environment to prevent hanging containers
+                try:
+                    if hasattr(env_client, 'close'):
+                        await env_client.close()
+                except Exception as e:
+                    pass
+                
+                # Pass the new score parameter
+                log_end(success=success, steps=steps_taken, score=final_score, rewards=safe_rewards)
                 
     except Exception as exc:
         print(f"[FATAL ERROR] Client setup failed: {exc}", flush=True)
