@@ -130,56 +130,66 @@ For submit_final_dataset, drop_missing_rows, or undo_last_action you may omit ne
 
 # ── 5. MAIN LOOP ──────────────────────────────────────────────────────────────
 async def main() -> None:
-    task_name = "data_cleaning_challenge"
     env_name  = "SST_hackathon_env"
-    rewards: list = []
-    steps_taken = 0
-    success = False
-
-    log_start(task=task_name, env=env_name, model=MODEL_NAME)
+    
+    # ⚠️ TRAP 1 FIX: These MUST match the 'id' fields in openenv.yaml exactly!
+    task_ids = ["task_1_age", "task_2_salary", "task_3_price"]
 
     try:
         env_client = DataCleanerClient(HF_SPACE_URL)
 
-        raw_reset = await env_client.reset()
-        obs_obj   = raw_reset[0] if isinstance(raw_reset, tuple) else raw_reset
-        obs_dict  = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else dict(obs_obj)
+        # Loop through all 3 tasks defined in your YAML
+        for task_id in task_ids:
+            rewards: list = []
+            steps_taken = 0
+            success = False
 
-        done = False
+            # TRAP 1 FIX: Logs the exact task ID the cloud validator is looking for
+            log_start(task=task_id, env=env_name, model=MODEL_NAME)
 
-        for step in range(1, 11):
-            if done:
-                break
+            try:
+                # Reset the environment for the new task
+                raw_reset = await env_client.reset()
+                obs_obj   = raw_reset[0] if isinstance(raw_reset, tuple) else raw_reset
+                obs_dict  = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else dict(obs_obj)
 
-            steps_taken = step
-            action = get_model_action(step, obs_dict)
+                done = False
 
-            # Single-line JSON for stdout (spec forbids embedded newlines)
-            action_str = action.model_dump_json(exclude_none=True).replace("\n", "")
+                for step in range(1, 11):
+                    if done:
+                        break
 
-            raw_step = await env_client.step(action)
-            obs_obj  = raw_step[0] if isinstance(raw_step, tuple) else raw_step
-            obs_dict = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else dict(obs_obj)
+                    steps_taken = step
+                    action = get_model_action(step, obs_dict)
 
-            reward = float(getattr(obs_obj, "reward", 0.05))
-            done   = bool(getattr(obs_obj, "done",   False))
+                    # Single-line JSON for stdout (spec forbids embedded newlines)
+                    action_str = action.model_dump_json(exclude_none=True).replace("\n", "")
 
-            rewards.append(reward)
-            log_step(step=step, action=action_str, reward=reward, done=done, error=None)
+                    raw_step = await env_client.step(action)
+                    obs_obj  = raw_step[0] if isinstance(raw_step, tuple) else raw_step
+                    obs_dict = obs_obj.model_dump() if hasattr(obs_obj, "model_dump") else dict(obs_obj)
 
-        # Success if the final grader reward is >= 0.90 (PASS score is 0.95)
-        if rewards and rewards[-1] >= 0.90:
-            success = True
+                    reward = float(getattr(obs_obj, "reward", 0.05))
+                    done   = bool(getattr(obs_obj, "done",   False))
 
+                    rewards.append(reward)
+                    log_step(step=step, action=action_str, reward=reward, done=done, error=None)
+
+                # Success if the final grader reward is >= 0.90 (PASS score is 0.95)
+                if rewards and rewards[-1] >= 0.90:
+                    success = True
+
+            except Exception as exc:
+                print(f"[ERROR] Task {task_id} failed: {exc}", flush=True)
+
+            finally:
+                if not rewards:
+                    rewards     = [0.05]   # never 0.0 — platform rejects boundary values
+                    steps_taken = 1
+                log_end(success=success, steps=steps_taken, rewards=rewards)
+                
     except Exception as exc:
-        print(f"[ERROR] {exc}", flush=True)
-
-    finally:
-        if not rewards:
-            rewards     = [0.05]   # never 0.0 — platform rejects boundary values
-            steps_taken = 1
-        log_end(success=success, steps=steps_taken, rewards=rewards)
-
+        print(f"[FATAL ERROR] Client setup failed: {exc}", flush=True)
 
 if __name__ == "__main__":
     asyncio.run(main())

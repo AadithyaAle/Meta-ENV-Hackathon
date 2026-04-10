@@ -20,12 +20,25 @@ async def health():
     return {"status": "healthy", "service": "SST_hackathon_env"}
 
 @app.get("/tasks")
+@app.get("/tasks")
 async def get_tasks():
     return {
         "tasks": [
-            {"name": "task_1_age", "description": "Fill missing Age with 25 and cast to integer."},
-            {"name": "task_2_salary", "description": "Drop rows where Salary is missing."},
-            {"name": "task_3_price", "description": "Convert Price column to integer type."},
+            {
+                "name": "task_1_age", 
+                "description": "Fill missing Age with 25 and cast to integer.",
+                "grader": {"type": "api", "endpoint": "/grader"}
+            },
+            {
+                "name": "task_2_salary", 
+                "description": "Drop rows where Salary is missing.",
+                "grader": {"type": "api", "endpoint": "/grader"}
+            },
+            {
+                "name": "task_3_price", 
+                "description": "Convert Price column to integer type.",
+                "grader": {"type": "api", "endpoint": "/grader"}
+            },
         ]
     }
 

@@ -26,7 +26,7 @@ def _score_from_df(df, check_fn) -> float:
         return 0.5
 
 
-def grade_task_1_age(state) -> float:
+def grade_task_1_age(state=None) -> float:
     """Grader for task_1_age: Fill missing Age with 25 and cast to int."""
     try:
         df = state.df if hasattr(state, "df") else None
@@ -43,7 +43,7 @@ def grade_task_1_age(state) -> float:
         return 0.5
 
 
-def grade_task_2_salary(state) -> float:
+def grade_task_2_salary(state=None) -> float:
     """Grader for task_2_salary: Drop rows where Salary is missing."""
     try:
         df = state.df if hasattr(state, "df") else None
@@ -55,7 +55,7 @@ def grade_task_2_salary(state) -> float:
         return 0.5
 
 
-def grade_task_3_price(state) -> float:
+def grade_task_3_price(state=None) -> float:
     """Grader for task_3_price: Convert Price column to integer type."""
     try:
         df = state.df if hasattr(state, "df") else None

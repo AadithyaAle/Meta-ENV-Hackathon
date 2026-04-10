@@ -9,17 +9,17 @@ tasks:
   - name: "task_1_age"
     description: "Fill missing Age with 25 and cast to integer."
     grader:
-      type: "function"
-      function: "server.graders:grade_task_1_age"
+      type: "api"
+      endpoint: "/grader"
 
   - name: "task_2_salary"
     description: "Drop rows where Salary is missing."
     grader:
-      type: "function"
-      function: "server.graders:grade_task_2_salary"
+      type: "api"
+      endpoint: "/grader"
 
   - name: "task_3_price"
     description: "Convert Price column to integer type."
     grader:
-      type: "function"
-      function: "server.graders:grade_task_3_price"
+      type: "api"
+      endpoint: "/grader"
